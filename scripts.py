@@ -28,6 +28,9 @@ def delete_records_older_than_one_month():
 		deleted = deleted + 1
 	print(str(deleted) + ' records deleted.')
 
+def clear_deleted_user_data():
+	pass
+
 if __name__ == "__main__":
 
 	delete_records_older_than_one_month()

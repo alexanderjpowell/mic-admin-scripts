@@ -79,6 +79,26 @@ if __name__ == "__main__":
 	user = auth.get_user_by_email('lotrrox@gmail.com')
 	print(user.displayName)
 
+	# To revoke access tokens - this will force user to sign back in within 1 hour
+	'''auth.revoke_refresh_tokens(uid)
+	user = auth.get_user(uid)
+	# Convert to seconds as the auth_time in the token claims is in seconds.
+	revocation_second = user.tokens_valid_after_timestamp / 1000
+	print('Tokens revoked at: {0}'.format(revocation_second))'''
+
+	# To define custom claims for a user
+	'''user = auth.get_user_by_email('user@admin.example.com')
+	# Confirm user is verified - custom claims cannot be set unless email is verified
+	if user.email_verified:
+	    # Add custom claims for additional privileges.
+	    # This will be picked up by the user on token refresh or next sign in on new device.
+	    auth.set_custom_user_claims(user.uid, {
+	        'admin': True
+	    })'''
+
+	# watch https://www.youtube.com/watch?v=3hj_r_N0qMs
+	# and https://www.youtube.com/watch?v=UZ9s_20Hk3U
+
 
 
 

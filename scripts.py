@@ -10,11 +10,14 @@ from firebase_admin import credentials, firestore
 from firebase_admin import auth
 import config
 import collections
+import csv
+import pytz
 
 cred = credentials.Certificate(config.serviceAccountKey)
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 
+utc = pytz.UTC
 DIRECTION_DESCENDING = firestore.Query.DESCENDING
 DIRECTION_ASCENDING = firestore.Query.ASCENDING
 
@@ -120,23 +123,120 @@ def getMostRecentScanForUser(uid):
 	query = db.collection('users/' + uid + '/scans').limit(1).order_by('timestamp', direction=DIRECTION_DESCENDING)
 	docs = list(query.stream())
 	if (len(docs) == 1):
-		print(docs[0].to_dict()[u'timestamp'])
+		print(docs[0].to_dict()[u'timestamp'].tzinfo)
+		return docs[0].to_dict()[u'timestamp']
 	else:
 		print("No scans found")
-	print("------------------------------")
+		return None
 
 def getMostRecentScans():
+	out = []
 	for user in list_users():
-		print(user.email)
-		getMostRecentScanForUser(user.uid)
+		email = user.email
+		print(email)
+		timestamp = getMostRecentScanForUser(user.uid)
+		if (timestamp is not None):
+			out.append([email, timestamp])
+	return out
 
+'''
+duration: days
+'''
+def getScansForUserInTimePeriod(user):
+	# startTime = datetime.now() - timedelta(days=duration)
+	startTime = datetime(2021, 11, 18, 0, 0)
+	startTime = utc.localize(startTime)
+	hour = 0
+	num_scans_per_hour = []
+	query = db.collection('users/' + user.uid + '/scans').where('timestamp', '>=', startTime).order_by('timestamp', direction=DIRECTION_ASCENDING)
+	docs = list(query.stream())
+
+	curTime = startTime + timedelta(hours=1)
+	# endTime = utc.localize(datetime.now())
+	endTime = datetime(2021, 12, 2, 0, 1)
+	endTime = utc.localize(endTime)
+	while (curTime < endTime):
+
+		counter = 0
+		for doc in docs:
+			timestamp = doc.to_dict()[u'timestamp']
+			if (timestamp <= curTime):
+				counter += 1
+			else:
+				break
+		# print(len(docs))
+		if (counter > 0):
+			del docs[:counter]
+
+		num_scans_per_hour.append(counter)
+		curTime += timedelta(hours=1)
+	# print(len(num_scans_per_hour))
+	# print(num_scans_per_hour)
+
+	# print("-----")
+	curTime = startTime #+ timedelta(hours=1)
+	print(len(num_scans_per_hour))
+
+	weeks = []
+	days = []
+
+	for i in range(len(num_scans_per_hour)):
+		if (i != 0 and i % 24 == 0):
+			# print(i)
+			weeks.append(days)
+			days = [num_scans_per_hour[i]]
+		else:
+			days.append(num_scans_per_hour[i])
+		if (num_scans_per_hour[i] > 0):
+			pass
+			# print(curTime)
+			# print(num_scans_per_hour[i])
+		curTime += timedelta(hours=1)
+	weeks.append(days)
+
+	print(weeks)
+	print(len(weeks))
+	write_heatmap_csv(weeks, user.email)
+
+'''
+heatmap param is a list of lists containing scan frequency in hours
+'''
+def write_heatmap_csv(heatmap, email):
+	# add day name to front of each nested list:
+	days = ["thursday", "friday", "saturday", "sunday", "monday", "tuesday", "wednesday"]
+	days = days + days
+	formatted_heatmap = []
+	for i in range(len(heatmap)):
+		new_day = [days[i]] + heatmap[i]
+		formatted_heatmap.append(new_day)
+		# formatted_heatmap.insert(0, days[i])
+	filename = "heatmaps/" + email + ".csv"
+	with open(filename, "w") as csvfile:
+		csvwriter = csv.writer(csvfile)
+		header = ["day"]
+		header.extend([str(i) + ":00" for i in range(24)])
+		csvwriter.writerow(header)
+		csvwriter.writerows(formatted_heatmap)
 
 if __name__ == "__main__":
 
+	user = auth.update_user('VX4QGsBEsAd5vPaNRfabmmGrA4f2', password='password')
+	print('Sucessfully updated user: {0}'.format(user.uid))
+
+	# for each customer:
+	# read all scans in last 2 weeks in descending order
+	# divide into hourly chunks
+	# for user in list_users():
+	# 	print(user.uid)
+	# 	getScansForUserInTimePeriod(user)
+		# getScansForUserInTimePeriod('1kyN8HCbC6gfZY8nNIYB1HjqRnH3')
+
 	# getMostRecentScanForUser('xgdRnVu3yrgjEhrMQgDSImBEOCc2')
-	getMostRecentScans()
-
-
+	# data = getMostRecentScans()
+	# with open('most_recent.csv', 'w', newline='') as csvfile:
+	# 	spamwriter = csv.writer(csvfile, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
+	# 	for row in data:
+	# 		spamwriter.writerow(row)
 
 
 
